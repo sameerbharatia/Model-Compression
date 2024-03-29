@@ -77,28 +77,48 @@ prune_iterative_train(model=distilled,
                       initial_train=False)
 
 
-def compress_model(distill, prune, factor, quantize):
+def compress_model(distill: bool, prune: bool, factor: bool, quantize: bool) -> nn.Module:
+    '''
+    Compress a model through distillation, pruning, factorization, and/or quantization based on provided flags.
+
+    Args:
+        distill (bool): If True, use a distilled version of the model. Otherwise, use the original version.
+        prune (bool): If True, prune the model to remove some weights.
+        factor (bool): If True, apply factorization to the model to reduce its complexity.
+        quantize (bool): If True, quantize the model to reduce the size of the weights.
+
+    Returns:
+        nn.Module: The compressed model after applying the specified compression techniques.
+
+    Note:
+        - This function assumes that the models are saved with names that reflect their compression states, such as 'distilled', 'original', 'pruned', and 'distilled_pruned'.
+    '''
+    # Choose the base model based on distillation flag
     model = ConvNet() if distill else DenseNet()
     model = model.to(DEVICE)
     model_file = 'distilled' if distill else 'original'
     
+    # Update model file name based on pruning
     if prune:
         model_file = 'pruned'
         if distill:
             model_file = 'distilled_pruned'
     
+    # Load the model
     load_model(model, f'{SAVED_MODELS}/{model_file}')
 
+    # Apply factorization if requested
     if factor:
         factor_model(model, 1)
 
+    # Apply quantization if requested
     if quantize:
         model = quantize_model(model)
     
     return model
 
 def get_leaf_layers(module, layers=None):
-    """
+    '''
     Recursively find all leaf layers in the given module.
 
     Parameters:
@@ -107,7 +127,7 @@ def get_leaf_layers(module, layers=None):
 
     Returns:
     - List of leaf layers.
-    """
+    '''
     if layers is None:
         layers = []
 
@@ -121,9 +141,22 @@ def get_leaf_layers(module, layers=None):
 
     return layers
 
-def get_quantized_model_size(model, pruned):
-    size_in_bytes = 0
+import torch.nn as nn
 
+def get_quantized_model_size(model: nn.Module, pruned: bool) -> int:
+    '''
+    Calculate the size of a quantized model in bytes. The size calculation includes
+    weights, biases, scales, and zero points for quantized layers, and accounts for
+    pruning if applicable.
+
+    Args:
+        model (nn.Module): The quantized PyTorch model.
+        pruned (bool): Indicates whether the model has been pruned.
+
+    Returns:
+        int: The size of the model in bytes.
+    '''
+    size_in_bytes = 0
     layers = get_leaf_layers(model)
 
     for layer in layers:
@@ -138,13 +171,28 @@ def get_quantized_model_size(model, pruned):
             size_in_bytes += bias.numel() * bias.element_size()
             size_in_bytes += scale.numel() * scale.element_size()
             size_in_bytes += zero_point.numel() * zero_point.element_size()
-        except:
+        except AttributeError:
+            # Fallback for non-quantized layers or layers that do not have the expected attributes
             for param in layer.parameters():
                 size_in_bytes += param.numel() * param.element_size()
 
     return size_in_bytes
 
-def get_model_size(model, quantized, pruned):
+def get_model_size(model: nn.Module, quantized: bool, pruned: bool) -> int:
+    '''
+    Calculate the size of a model in bytes, supporting both quantized and non-quantized models.
+    For quantized models, it includes the size of weights, biases, scales, and zero points.
+    For non-quantized models, it calculates the size based on the weights and potentially pruned elements.
+    Additionally, the size of model buffers is included in the calculation.
+
+    Args:
+        model (nn.Module): The PyTorch model, either quantized or not.
+        quantized (bool): Indicates if the model is quantized.
+        pruned (bool): Indicates whether the model has been pruned.
+
+    Returns:
+        int: The total size of the model in bytes.
+    '''
     size_in_bytes = 0
 
     if quantized:
@@ -162,6 +210,7 @@ def get_model_size(model, quantized, pruned):
     return int(size_in_bytes)
 
 
+# Generate all combinations of compression
 accuracies = []
 sizes = []
 
@@ -180,6 +229,7 @@ for distill in [True, False]:
 
                 print(f'{combination}: Accuracy: {accuracy:.2%} Size: {size / 1e6}MB')
 
+# Save compression data for all combinations
 combinations = []
 for distill in [True, False]:
     for prune in [True, False]:
@@ -187,7 +237,7 @@ for distill in [True, False]:
             for quantize in [True, False]:
                 true_conditions = [cond for cond, active in zip(['distill', 'prune', 'factor', 'quantize'],
                                                                 [distill, prune, factor, quantize]) if active]
-                combination = ', '.join(true_conditions) if true_conditions else "no compression"
+                combination = ', '.join(true_conditions) if true_conditions else 'no compression'
                 combinations.append(combination)
 
 compression_data = pd.DataFrame({'combination': combinations, 'size': sizes, 'accuracy': accuracies})

@@ -16,12 +16,12 @@ transform = transforms.Compose([
     transforms.RandomHorizontalFlip(),  # Randomly flips the image horizontally
     transforms.RandomRotation(15),  # Randomly rotates the image
     transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),  # Randomly jitters color
-    transforms.ToTensor(),  # Converts to tensor
-    transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010]),  # Normalizes the dataset
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010]),
 ])
 
 val_transform = transforms.Compose([
-    transforms.ToTensor(),  # Converts to tensor
+    transforms.ToTensor(),
     transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010]),  # Normalizes the dataset with the same values as the training set
 ])
 
